@@ -1,7 +1,7 @@
 # Developed by Dennis - 2024-05-09 - denbe52@yahoo.com
 # Retrieve prices for CANADIAN DEPOSITARY RECEIPTS (CDR) from Yahoo
 # https://www.cboe.ca/en/services/raising-assets/canadian-depositary-receipts
-# Save prices in a csv file named Q.csv that can be imported into Quicken (Canadian)
+# Save prices in a csv file that can be imported into Quicken (Canadian)
 
 # This module uses yfinance to retrieve the prices from Yahoo
 # https://github.com/ranaroussi/yfinance
@@ -28,10 +28,10 @@ class CachedLimiterSession(CacheMixin, LimiterMixin, Session):
 
 class CdrPrices:
     def __init__(self):
-        self.file_csv = Path(__file__).parent.absolute() / Path('Q.csv')
-        self.symbols = []
-        self.days = 5      # Number of calendar days of data to download (e.g. 730 for the past two years)
-        self.beg = f'{(dt.now() - timedelta(days=self.days)):%Y-%m-%d}'  # e.g. '2020-01-31'
+        # create default data set
+        self.quicken_csv_file = 'Q.csv'         # default name of csv file
+        self.symbols = ['AMZN.NE', 'MSFT.NE']   # default list of symbols
+        self.days = 5                           # default number of calendar days of prices to download
 
     def load_yahoo_prices(self):
         session = CachedLimiterSession(
@@ -41,16 +41,19 @@ class CdrPrices:
         )
         session.headers['User-agent'] = 'my-program/1.01'
 
-        print(f'Clearing data from : {self.file_csv}')
-        with open(self.file_csv, 'w+') as f:
+        file_csv = Path(__file__).parent.absolute() / Path(self.quicken_csv_file)
+        print(f'Clearing data from : {file_csv}')
+        with open(file_csv, 'w+') as f:
             f.close()
 
+        begin = f'{(dt.now() - timedelta(days=self.days)):%Y-%m-%d}'  # e.g. '2020-01-31'
+
         dfp = pd.DataFrame()
-        print(f'Loading Prices at  : {dt.now():%Y-%m-%d %H:%M:%S} into {self.file_csv}')
-        print(f'Loading Prices from: {self.beg}')
+        print(f'Loading Prices at  : {dt.now():%Y-%m-%d %H:%M:%S} into {file_csv}')
+        print(f'Loading Prices from: {begin}')
         for symbol in self.symbols:
             try:
-                df = yf.download(symbol, start=self.beg, end=None, session=session)
+                df = yf.download(symbol, start=begin, end=None, session=session)
                 df['Symbol'] = symbol
                 df.drop(['Open', 'High', 'Low', 'Adj Close', 'Volume'], axis=1, inplace=True)
                 df.reset_index(inplace=True)
@@ -65,16 +68,17 @@ class CdrPrices:
         dfp = dfp[['Symbol', 'Close', 'Date']]  # Re-order the columns
         dfp['Date'] = dfp['Date'].dt.strftime("%d/%m/%Y")
         dfp['Close'] = np.round(dfp['Close'], decimals=3)
-        dfp.to_csv(self.file_csv, mode='w', lineterminator='', index=False, header=False)  # save to csv
-        print(f'Finished Saving CDR_prices to: {self.file_csv}')
+        dfp.to_csv(self.quicken_csv_file, mode='w', lineterminator='', index=False, header=False)  # save to csv
+        print(f'Finished Saving CDR_prices to: {self.quicken_csv_file}')
 
 
 if __name__ == '__main__':
     cdr = CdrPrices()
+    cdr.quicken_csv_file = 'Q.csv'
     cdr.symbols = ['AMD.NE', 'AMZN.NE', 'AVGO.NE', 'CATR.NE', 'CITI.NE', 'COST.NE',
                    'IBM.NE', 'JPM.NE', 'LLY.NE', 'NVDA.NE', 'UBER.NE']
+    cdr.days = 5  # Number of calendar days of data to download (e.g. 730 for the past two years)
     print(f'symbols = {cdr.symbols}')
-    cdr.days = 5
     cdr.load_yahoo_prices()
     print(f'Finished at {dt.now():%Y-%m-%d %H:%M:%S}')
     exit()
